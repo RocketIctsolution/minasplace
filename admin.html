@@ -1,0 +1,66 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>Minasplace Admin</title>
+<style>
+:root{--tan:#bb8a5f;--peach:#f3d4b5;--ink:#2a2420;--bg:#fcf6ee}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Helvetica,Arial,sans-serif}
+.wrap{max-width:900px;margin:auto;padding:20px}h1,h2{margin:0 0 14px}
+.box{background:#fff;border:1px solid var(--peach);border-radius:12px;padding:20px;margin-bottom:20px}
+input,textarea{width:100%;padding:12px;margin:6px 0 12px;border:1px solid #d9c7b3;border-radius:8px;font:inherit}
+button{background:var(--tan);color:#fff;border:0;padding:12px 18px;border-radius:8px;font:inherit;cursor:pointer}button.alt{background:#fff;color:var(--ink);border:1px solid var(--tan)}button.del{background:#b3261e}
+button:disabled{opacity:.5}.bar{height:8px;background:var(--peach);border-radius:4px;overflow:hidden;display:none}.bar i{display:block;height:100%;width:0;background:var(--tan)}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.row{display:flex;gap:14px;align-items:center;padding:12px 0;border-bottom:1px solid var(--peach)}.row:last-child{border:0}
+.row .m{width:84px;height:84px;object-fit:cover;border-radius:8px;background:#ddd;flex:none}.row .i{flex:1;min-width:0}.row .a{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.tag{font-size:12px;padding:3px 8px;border-radius:10px;background:#d9f2e0;color:#176b34}.tag.o{background:#fde0de;color:#b3261e}
+.err{color:#b3261e;min-height:20px}small{color:#7a6f66}@media(max-width:600px){.row{flex-wrap:wrap}.row .a{justify-content:flex-start}}
+</style></head><body><div class="wrap">
+<div id="login" class="box" style="max-width:420px;margin:60px auto"><h2>Minasplace Admin</h2>
+<label>Email<input id="em" type="email" autocomplete="username"></label><label>Password<input id="pw" type="password" autocomplete="current-password"></label>
+<div class="err" id="le"></div><button id="lb">Log in</button></div>
+<div id="app" hidden>
+<div class="top"><h1>Products</h1><span><a href="index.html" target="_blank">View store</a> &nbsp; <button class="alt" id="lo">Log out</button></span></div>
+<div class="box"><h2>Add a product</h2>
+<label>Name<input id="nm" maxlength="80"></label>
+<label>Description (optional)<textarea id="ds" rows="2" maxlength="200"></textarea></label>
+<label>Price in ₦ (optional)<input id="pr" type="number" min="0" inputmode="numeric"></label>
+<label>Picture or video<input id="fl" type="file" accept="image/*,video/*"></label>
+<div class="bar" id="bar"><i id="bi"></i></div><div class="err" id="ae"></div>
+<button id="ab">Upload &amp; publish</button></div>
+<div class="box"><h2>Your products</h2><div id="ls"><small>Loading…</small></div></div></div></div>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getFirestore,collection,addDoc,doc,updateDoc,deleteDoc,query,orderBy,onSnapshot,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {getStorage,ref,uploadBytesResumable,getDownloadURL,deleteObject} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+import {firebaseConfig} from "./firebase-config.js";
+const $=s=>document.getElementById(s),app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app),st=getStorage(app);
+let unsub=null;
+$("lb").onclick=async()=>{$("le").textContent="";try{await signInWithEmailAndPassword(auth,$("em").value.trim(),$("pw").value)}catch(e){$("le").textContent="Login failed. Check your email and password."}};
+$("pw").onkeydown=e=>{if(e.key==="Enter")$("lb").click()};
+$("lo").onclick=()=>signOut(auth);
+onAuthStateChanged(auth,u=>{$("login").hidden=!!u;$("app").hidden=!u;if(unsub){unsub();unsub=null}
+ if(u)unsub=onSnapshot(query(collection(db,"products"),orderBy("createdAt","desc")),s=>list(s.docs.map(d=>({id:d.id,...d.data()}))),e=>$("ls").textContent="Could not load products: "+e.message)});
+function list(a){const box=$("ls");box.innerHTML="";if(!a.length){box.innerHTML="<small>No products yet. Add your first one above.</small>";return}
+ a.forEach(p=>{const r=document.createElement("div");r.className="row";
+ const m=document.createElement(p.mediaType==="video"?"video":"img");m.className="m";m.src=p.mediaUrl;if(p.mediaType==="video"){m.muted=true;m.preload="metadata"}
+ const i=document.createElement("div");i.className="i";const t=document.createElement("b");t.textContent=p.name;const sub=document.createElement("div");
+ sub.innerHTML=`<small></small> <span class="tag ${p.inStock?"":"o"}">${p.inStock?"In stock":"Out of stock"}</span>`;sub.firstChild.textContent=p.price?"₦"+Number(p.price).toLocaleString():"No price";
+ i.append(t,sub);const a2=document.createElement("div");a2.className="a";
+ const b1=btn(p.inStock?"Mark out of stock":"Mark in stock","alt",()=>updateDoc(doc(db,"products",p.id),{inStock:!p.inStock}));
+ const b2=btn("Edit","alt",async()=>{const n=prompt("Product name",p.name);if(n===null)return;const pr=prompt("Price in ₦ (leave empty for none)",p.price||"");if(pr===null)return;
+  await updateDoc(doc(db,"products",p.id),{name:n.trim()||p.name,price:pr.trim()===""?null:Number(pr)})});
+ const b3=btn("Delete","del",async()=>{if(!confirm("Delete “"+p.name+"” permanently?"))return;
+  try{if(p.mediaPath)await deleteObject(ref(st,p.mediaPath))}catch(e){}await deleteDoc(doc(db,"products",p.id))});
+ a2.append(b1,b2,b3);r.append(m,i,a2);box.append(r)})}
+function btn(l,c,f){const b=document.createElement("button");b.textContent=l;b.className=c;b.onclick=async()=>{b.disabled=true;try{await f()}catch(e){alert("Failed: "+e.message)}b.disabled=false};return b}
+$("ab").onclick=()=>{const f=$("fl").files[0],n=$("nm").value.trim();$("ae").textContent="";
+ if(!n)return $("ae").textContent="Enter a product name.";if(!f)return $("ae").textContent="Choose a picture or video.";
+ const isV=f.type.startsWith("video/");if(!isV&&!f.type.startsWith("image/"))return $("ae").textContent="File must be an image or a video.";
+ if(f.size>(isV?100:10)*1048576)return $("ae").textContent=isV?"Video must be under 100 MB.":"Image must be under 10 MB.";
+ const path="products/"+Date.now()+"_"+f.name.replace(/[^\w.\-]/g,"_"),task=uploadBytesResumable(ref(st,path),f);
+ $("ab").disabled=true;$("bar").style.display="block";
+ task.on("state_changed",s=>{$("bi").style.width=(s.bytesTransferred/s.totalBytes*100)+"%"},e=>{$("ae").textContent="Upload failed: "+e.message;$("ab").disabled=false},async()=>{
+  try{const url=await getDownloadURL(task.snapshot.ref),pr=$("pr").value;
+   await addDoc(collection(db,"products"),{name:n,description:$("ds").value.trim(),price:pr?Number(pr):null,mediaType:isV?"video":"image",mediaUrl:url,mediaPath:path,inStock:true,createdAt:serverTimestamp()});
+   ["nm","ds","pr","fl"].forEach(k=>$(k).value="");$("bar").style.display="none";$("bi").style.width="0"}catch(e){$("ae").textContent="Saved file but not product: "+e.message}
+  $("ab").disabled=false})};
+</script></body></html>
