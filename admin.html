@@ -12,36 +12,37 @@ button:disabled{opacity:.5}.bar{height:8px;background:var(--peach);border-radius
 .row .m{width:84px;height:84px;object-fit:cover;border-radius:8px;background:#ddd;flex:none}.row .i{flex:1;min-width:0}.row .a{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 .tag{font-size:12px;padding:3px 8px;border-radius:10px;background:#d9f2e0;color:#176b34}.tag.o{background:#fde0de;color:#b3261e}
 .err{color:#b3261e;min-height:20px}small{color:#7a6f66}@media(max-width:600px){.row{flex-wrap:wrap}.row .a{justify-content:flex-start}}
-</style></head><body><div class="wrap">
+.pv{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}.pv .t{position:relative;width:84px;height:84px}.pv .t img,.pv .t video{width:100%;height:100%;object-fit:cover;border-radius:8px}.pv .o{position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-weight:700;font-size:14px;border-radius:8px;background:rgba(0,0,0,.35)}.pv .o:empty{display:none}.pv .o.ok{background:rgba(23,107,52,.55);font-size:26px}</style></head><body><div class="wrap">
 <div id="login" class="box" style="max-width:420px;margin:60px auto"><h2>Minasplace Admin</h2>
 <label>Email<input id="em" type="email" autocomplete="username"></label><label>Password<input id="pw" type="password" autocomplete="current-password"></label>
-<div class="err" id="le"></div><button id="lb">Log in</button></div>
+<div class="err" id="le"></div><button id="lb">Log in</button> <button class="alt" id="fp" type="button">Forgot password?</button></div>
 <div id="app" hidden>
 <div class="top"><h1>Products</h1><span><a href="index.html" target="_blank">View store</a> &nbsp; <button class="alt" id="lo">Log out</button></span></div>
 <div class="box"><h2>Add a product</h2>
 <label>Name<input id="nm" maxlength="80"></label>
 <label>Description (optional)<textarea id="ds" rows="2" maxlength="200"></textarea></label>
 <label>Price in ₦ (optional)<input id="pr" type="number" min="0" inputmode="numeric"></label>
-<label>Picture or video<input id="fl" type="file" accept="image/*,video/*"></label>
-<div class="bar" id="bar"><i id="bi"></i></div><div class="err" id="ae"></div>
+<label>Pictures (up to 6) or one video<input id="fl" type="file" accept="image/*,video/*" multiple></label>
+<div class="pv" id="pv"></div>
+<div class="bar" id="bar"><i id="bi"></i></div><small id="pt"></small><div class="err" id="ae"></div>
 <button id="ab">Upload &amp; publish</button></div>
 <div class="box"><h2>Your products</h2><div id="ls"><small>Loading…</small></div></div></div></div>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getAuth,signInWithEmailAndPassword,sendPasswordResetEmail,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {getFirestore,collection,addDoc,doc,updateDoc,deleteDoc,query,orderBy,onSnapshot,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import {getStorage,ref,uploadBytesResumable,getDownloadURL,deleteObject} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
-import {firebaseConfig} from "./firebase-config.js";
-const $=s=>document.getElementById(s),app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app),st=getStorage(app);
+import {firebaseConfig,cloudinaryConfig} from "./firebase-config.js";
+const $=s=>document.getElementById(s),app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
 let unsub=null;
 $("lb").onclick=async()=>{$("le").textContent="";try{await signInWithEmailAndPassword(auth,$("em").value.trim(),$("pw").value)}catch(e){$("le").textContent="Login failed. Check your email and password."}};
 $("pw").onkeydown=e=>{if(e.key==="Enter")$("lb").click()};
+$("fp").onclick=async()=>{const e=$("em").value.trim();if(!e){$("le").textContent="Type your admin email above first, then tap Forgot password.";return}try{await sendPasswordResetEmail(auth,e)}catch(x){}$("le").style.color="#176b34";$("le").textContent="If that email has an admin account, a reset link has been sent. Check your inbox and spam folder."};
 $("lo").onclick=()=>signOut(auth);
 onAuthStateChanged(auth,u=>{$("login").hidden=!!u;$("app").hidden=!u;if(unsub){unsub();unsub=null}
  if(u)unsub=onSnapshot(query(collection(db,"products"),orderBy("createdAt","desc")),s=>list(s.docs.map(d=>({id:d.id,...d.data()}))),e=>$("ls").textContent="Could not load products: "+e.message)});
 function list(a){const box=$("ls");box.innerHTML="";if(!a.length){box.innerHTML="<small>No products yet. Add your first one above.</small>";return}
  a.forEach(p=>{const r=document.createElement("div");r.className="row";
- const m=document.createElement(p.mediaType==="video"?"video":"img");m.className="m";m.src=p.mediaUrl;if(p.mediaType==="video"){m.muted=true;m.preload="metadata"}
+ const m=document.createElement(p.mediaType==="video"?"video":"img");m.className="m";m.src=(p.images&&p.images[0])||p.mediaUrl;if(p.mediaType==="video"){m.muted=true;m.preload="metadata"}
  const i=document.createElement("div");i.className="i";const t=document.createElement("b");t.textContent=p.name;const sub=document.createElement("div");
  sub.innerHTML=`<small></small> <span class="tag ${p.inStock?"":"o"}">${p.inStock?"In stock":"Out of stock"}</span>`;sub.firstChild.textContent=p.price?"₦"+Number(p.price).toLocaleString():"No price";
  i.append(t,sub);const a2=document.createElement("div");a2.className="a";
@@ -49,18 +50,33 @@ function list(a){const box=$("ls");box.innerHTML="";if(!a.length){box.innerHTML=
  const b2=btn("Edit","alt",async()=>{const n=prompt("Product name",p.name);if(n===null)return;const pr=prompt("Price in ₦ (leave empty for none)",p.price||"");if(pr===null)return;
   await updateDoc(doc(db,"products",p.id),{name:n.trim()||p.name,price:pr.trim()===""?null:Number(pr)})});
  const b3=btn("Delete","del",async()=>{if(!confirm("Delete “"+p.name+"” permanently?"))return;
-  try{if(p.mediaPath)await deleteObject(ref(st,p.mediaPath))}catch(e){}await deleteDoc(doc(db,"products",p.id))});
+  await deleteDoc(doc(db,"products",p.id))});
  a2.append(b1,b2,b3);r.append(m,i,a2);box.append(r)})}
 function btn(l,c,f){const b=document.createElement("button");b.textContent=l;b.className=c;b.onclick=async()=>{b.disabled=true;try{await f()}catch(e){alert("Failed: "+e.message)}b.disabled=false};return b}
-$("ab").onclick=()=>{const f=$("fl").files[0],n=$("nm").value.trim();$("ae").textContent="";
- if(!n)return $("ae").textContent="Enter a product name.";if(!f)return $("ae").textContent="Choose a picture or video.";
- const isV=f.type.startsWith("video/");if(!isV&&!f.type.startsWith("image/"))return $("ae").textContent="File must be an image or a video.";
- if(f.size>(isV?100:10)*1048576)return $("ae").textContent=isV?"Video must be under 100 MB.":"Image must be under 10 MB.";
- const path="products/"+Date.now()+"_"+f.name.replace(/[^\w.\-]/g,"_"),task=uploadBytesResumable(ref(st,path),f);
- $("ab").disabled=true;$("bar").style.display="block";
- task.on("state_changed",s=>{$("bi").style.width=(s.bytesTransferred/s.totalBytes*100)+"%"},e=>{$("ae").textContent="Upload failed: "+e.message;$("ab").disabled=false},async()=>{
-  try{const url=await getDownloadURL(task.snapshot.ref),pr=$("pr").value;
-   await addDoc(collection(db,"products"),{name:n,description:$("ds").value.trim(),price:pr?Number(pr):null,mediaType:isV?"video":"image",mediaUrl:url,mediaPath:path,inStock:true,createdAt:serverTimestamp()});
-   ["nm","ds","pr","fl"].forEach(k=>$(k).value="");$("bar").style.display="none";$("bi").style.width="0"}catch(e){$("ae").textContent="Saved file but not product: "+e.message}
-  $("ab").disabled=false})};
+let files=[];
+$("fl").onchange=()=>{files=[...$("fl").files];$("ae").textContent="";$("pt").textContent="";
+ if(files.some(f=>f.type.startsWith("video/"))&&files.length>1){$("ae").textContent="Choose either one video or several pictures, not both.";files=[];$("fl").value=""}
+ else if(files.length>6){$("ae").textContent="Maximum 6 pictures per product. Using the first 6.";files=files.slice(0,6)}
+ prev()};
+function prev(){const b=$("pv");b.innerHTML="";files.forEach((f,i)=>{const t=document.createElement("div");t.className="t";const v=f.type.startsWith("video/"),m=document.createElement(v?"video":"img");m.src=URL.createObjectURL(f);if(v)m.muted=true;
+ const o=document.createElement("span");o.className="o";o.id="o"+i;t.append(m,o);b.append(t)})}
+function up(f,i,n){return new Promise((res,rej)=>{const fd=new FormData();fd.append("file",f);fd.append("upload_preset",cloudinaryConfig.uploadPreset);fd.append("folder","minasplace");
+ const x=new XMLHttpRequest();x.open("POST","https://api.cloudinary.com/v1_1/"+cloudinaryConfig.cloudName+"/auto/upload");
+ x.upload.onprogress=e=>{if(e.lengthComputable){const p=e.loaded/e.total;$("o"+i).textContent=Math.round(p*100)+"%";$("bi").style.width=((i+p)/n*100)+"%";$("pt").textContent="Uploading "+(i+1)+" of "+n+"…"}};
+ x.onerror=()=>rej(new Error("Network error. Check your internet connection."));
+ x.onload=()=>{try{const r=JSON.parse(x.responseText);if(x.status>=300)throw new Error(r.error&&r.error.message||"Upload error");res(r)}catch(e){rej(e)}};
+ x.send(fd)})}
+$("ab").onclick=async()=>{const n=$("nm").value.trim();$("ae").textContent="";
+ if(!n)return $("ae").textContent="Enter a product name.";if(!files.length)return $("ae").textContent="Choose at least one picture or a video.";
+ for(const f of files){const v=f.type.startsWith("video/");if(!v&&!f.type.startsWith("image/"))return $("ae").textContent="Files must be pictures or a video.";
+  if(f.size>(v?100:10)*1048576)return $("ae").textContent=f.name+" is too big (images max 10 MB, video max 100 MB)."}
+ $("ab").disabled=true;$("fl").disabled=true;$("bar").style.display="block";const urls=[];let type="image";
+ try{for(let i=0;i<files.length;i++){const r=await up(files[i],i,files.length);urls.push(r.secure_url);if(r.resource_type==="video")type="video";
+   const t=$("o"+i);t.textContent="✓";t.className="o ok";if(r.resource_type!=="video")t.parentNode.querySelector("img").src=r.secure_url}
+  const pr=$("pr").value;
+  await addDoc(collection(db,"products"),{name:n,description:$("ds").value.trim(),price:pr?Number(pr):null,mediaType:type,mediaUrl:urls[0],images:urls,inStock:true,createdAt:serverTimestamp()});
+  $("pt").textContent="Published ✓ "+urls.length+" file"+(urls.length>1?"s":"")+" saved to the store.";
+  setTimeout(()=>{["nm","ds","pr","fl"].forEach(k=>$(k).value="");files=[];$("pv").innerHTML="";$("bar").style.display="none";$("bi").style.width="0";$("pt").textContent=""},3000)
+ }catch(e){$("ae").textContent="Upload failed: "+e.message;$("bar").style.display="none"}
+ $("ab").disabled=false;$("fl").disabled=false};
 </script></body></html>
